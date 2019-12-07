@@ -40,6 +40,46 @@ partOne = case findBestSequence input of
   Just (Tuple seq score) -> score
   Nothing -> 0
 
+data AmpState = AmpState ProgState ProgState ProgState ProgState ProgState
+
+testFeedbackSequence :: Partial => MemState -> Array Int -> Int
+testFeedbackSequence prog [pA, pB, pC, pD, pE] =
+  let
+    initA = newProgState [pA, 0] prog
+    initB = newProgState [pB] prog
+    initC = newProgState [pC] prog
+    initD = newProgState [pD] prog
+    initE = newProgState [pE] prog
+  in oneLoop (AmpState initA initB initC initD initE)
+  where
+    oneLoop :: AmpState -> Int
+    oneLoop (AmpState psa psb psc psd pse) =
+      let
+        npsa@(ProgState _ _ _ _ (Just outputA)) =
+          runProgState psa
+        npsb@(ProgState _ _ _ _ (Just outputB)) =
+          runProgState (appendInput outputA psb)
+        npsc@(ProgState _ _ _ _ (Just outputC)) =
+          runProgState (appendInput outputB psc)
+        npsd@(ProgState _ _ _ _ (Just outputD)) =
+          runProgState (appendInput outputC psd)
+        npse@(ProgState _ _ statusE _ (Just outputE)) =
+          runProgState (appendInput outputD pse)
+      in case statusE of
+        Halted -> outputE
+        _ -> oneLoop $ AmpState (appendInput outputE npsa) npsb npsc npsd npse
+
+findBestFeedbackSequnce :: MemState -> Maybe (Tuple (Array Int) Int)
+findBestFeedbackSequnce initProg =
+  maximumBy (\(Tuple seq1 score1) (Tuple seq2 score2) -> compare score1 score2)
+  (map (\seq -> Tuple seq (unsafePartial $ testFeedbackSequence initProg seq))
+   (permutations (5..9) ))
+
+partTwo :: Int
+partTwo = case findBestFeedbackSequnce input of
+  Just (Tuple seq score) -> score
+  Nothing -> 0
+
 testInput1 :: MemState
 testInput1 = [3,15,3,16,1002,16,10,16,1,16,15,15,4,15,99,0,0]
 

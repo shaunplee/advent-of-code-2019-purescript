@@ -28,10 +28,12 @@ type Output
 data Status
   = Running
   | Halted
+  | Paused
 
 instance statusShow :: Show Status where
   show Running = "Running"
   show Halted = "Halted"
+  show Paused = "Paused"
 
 data ProgState
   = ProgState MemState IP Status Input Output
@@ -108,7 +110,7 @@ getVals mem ps pms = map (\(Tuple p i) -> case index pms i of
 
 step :: Partial => ProgState -> ProgState
 step ps@(ProgState _ _ Halted _ _) = ps
-step (ProgState prog pos Running input output) =
+step (ProgState prog pos _ input output) =
   let
     (OpMode op modes) = parseOpMode (fromMaybe 0 (index prog pos))
 
@@ -160,20 +162,33 @@ step (ProgState prog pos Running input output) =
            let
              [val] = getVals prog [dst] modes
            in
-            ProgState prog (pos + insLength) Running input val
+            ProgState prog (pos + insLength) Paused input val
     1 -> case op of
       Opcode 99 -> ProgState prog (pos + insLength) Halted input output
     _ -> ProgState prog (pos + insLength) Halted input output
 
 runProg :: Input -> MemState -> ProgState
-runProg input p = runProg' (newProg input p)
+runProg input p = runProg' (newProgState input p)
   where
-  runProg' ps@(ProgState m _ Halted _ _) = ps
+  runProg' ps@(ProgState _ _ Halted _ _) = ps
 
-  runProg' ps@(ProgState _ _ Running _ _) = runProg' $ unsafePartial step ps
+  runProg' ps = runProg' $ unsafePartial step ps
 
-newProg :: Input -> MemState -> ProgState
-newProg input p = (ProgState p 0 Running input Nothing)
+newProgState :: Input -> MemState -> ProgState
+newProgState input p = (ProgState p 0 Running input Nothing)
+
+runProgState :: ProgState -> ProgState
+runProgState ps@(ProgState _ _ Halted _ _) = ps
+runProgState ps@(ProgState _ _ _ _ _) =
+  runProgState' $ unsafePartial step ps
+  where
+    runProgState' ps'@(ProgState _ _ Running _ _) =
+      runProgState' $ unsafePartial step ps'
+    runProgState' ps' = ps'
+
+appendInput :: Int -> ProgState -> ProgState
+appendInput i (ProgState ms ip status input output) =
+  ProgState ms ip status (snoc input i) output
 
 runOutput :: Input -> MemState -> Int
 runOutput input p = unsafePartial case runProg input p of
