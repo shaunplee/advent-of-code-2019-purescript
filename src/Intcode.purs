@@ -20,7 +20,7 @@ type IP
   = Int
 
 type Input
-  = Int
+  = Array Int
 
 type Output
   = Maybe Int
@@ -147,9 +147,15 @@ step (ProgState prog pos Running input output) =
        case op of
          Opcode 3 ->
            let
-             Just newstate = modifyAt dst (const input) prog
+             Just inval = head input
+             Just newstate = modifyAt dst (const inval) prog
            in
-            ProgState newstate (pos + insLength) Running input output
+            (ProgState
+             newstate
+             (pos + insLength)
+             Running
+             (fromMaybe [] $ tail input)
+             output)
          Opcode 4 ->
            let
              [val] = getVals prog [dst] modes
@@ -168,3 +174,7 @@ runProg input p = runProg' (newProg input p)
 
 newProg :: Input -> MemState -> ProgState
 newProg input p = (ProgState p 0 Running input Nothing)
+
+runOutput :: Input -> MemState -> Int
+runOutput input p = unsafePartial case runProg input p of
+  ProgState _ _ Halted _ (Just x) -> x
