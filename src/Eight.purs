@@ -16,7 +16,8 @@ type Layer = Array Char
 instance showImage :: Show Image where
   show (Image ls dim) = case unsnoc ls of
     Nothing -> "<empty image>"
-    Just {init, last} -> replaceAll (Pattern "0") (Replacement " ") $
+    Just {init, last} -> replaceAll (Pattern "1") (Replacement "*") $
+      replaceAll (Pattern "0") (Replacement " ") $
       foldMap (fromCharArray <<< (flip snoc '\n')) $
       reshape (foldr (zipWith flattenLayers) last init) dim
 
